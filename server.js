@@ -13,7 +13,7 @@ const app = express();
 const port = 3000;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// --- DATABASE ---
+// --- DATABASE SETUP ---
 const db = new sqlite3.Database('./webapp.sqlite', (err) => {
     if (err) console.error("DB Error:", err);
     else console.log("✅ Connected to SQLite Database");
@@ -33,7 +33,7 @@ app.use(session({
     saveUninitialized: false
 }));
 
-// --- ROUTES ---
+// --- AUTH ROUTES ---
 app.post('/api/register', async (req, res) => {
     const { username, password } = req.body;
     if(!username || !password) return res.status(400).json({error: "Missing fields"});
@@ -66,17 +66,15 @@ app.get('/api/user', (req, res) => {
     else res.json({ loggedIn: false });
 });
 
+// --- HISTORY ROUTES ---
 app.get('/api/history', (req, res) => {
     if (!req.session.userId) return res.status(401).json({ error: "Not logged in" });
     db.all(`SELECT * FROM history WHERE user_id = ? ORDER BY id DESC`, [req.session.userId], (err, rows) => res.json(rows));
 });
 
-// --- NEW DELETE ROUTE ---
 app.delete('/api/history/:id', (req, res) => {
     if (!req.session.userId) return res.status(401).json({ error: "Not logged in" });
-    
     const recordId = req.params.id;
-    // We strictly check user_id to ensure users can only delete THEIR OWN history
     db.run(`DELETE FROM history WHERE id = ? AND user_id = ?`, [recordId, req.session.userId], function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true });
@@ -117,9 +115,19 @@ app.post('/api/run-test', async (req, res) => {
 
         exec(`node ${testFileName}`, (error, stdout, stderr) => {
             const status = stdout.includes("TEST_RESULT: PASS") ? "PASS" : "FAIL";
+            
+            // Save to DB
             db.run(`INSERT INTO history (user_id, url, instruction, status, date, logs) VALUES (?, ?, ?, ?, ?, ?)`,
                 [req.session.userId, url, instruction, status, new Date().toLocaleString(), stdout]
             );
+
+            // AUTO-DELETE: Clean up the file immediately after running
+            try {
+                fs.unlinkSync(testFileName);
+            } catch (err) {
+                console.error("Could not delete temp file:", err);
+            }
+            
             res.json({ success: true, output: stdout, status: status });
         });
     } catch (error) {
