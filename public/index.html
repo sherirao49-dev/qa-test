@@ -3,87 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI QA Tester</title>
+    <title>Login - AI QA</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 2rem auto; background-color: #f4f4f9; }
-        .container { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h1 { color: #333; text-align: center; }
-        label { font-weight: bold; display: block; margin-top: 1rem; }
-        input, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box;}
-        button { width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px; margin-top: 20px; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
-        #logs { margin-top: 20px; padding: 15px; background: #222; color: #0f0; font-family: monospace; border-radius: 6px; white-space: pre-wrap; display: none; }
-        .loading { text-align: center; margin-top: 10px; display: none; color: #666; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+        }
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 350px;
+            text-align: center;
+        }
+        .login-card h2 { margin-top: 0; color: #333; margin-bottom: 20px; }
+        .login-card p { color: #666; font-size: 14px; margin-bottom: 30px; }
+        
+        input {
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            background: #f9f9f9;
+            transition: 0.3s;
+        }
+        input:focus { border-color: #764ba2; outline: none; background: #fff; }
+        
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(to right, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(118, 75, 162, 0.4); }
+        
+        a { display: block; margin-top: 20px; color: #666; text-decoration: none; font-size: 13px; }
+        a:hover { color: #764ba2; text-decoration: underline; }
     </style>
 </head>
 <body>
-
-    <div class="container">
-        <h1>🤖 Automated QA Tester</h1>
-        <p style="text-align:center; color:#666;">Enter a website and task. The AI will write and run a test script.</p>
-
-        <label>🔑 Gemini API Key</label>
-        <input type="password" id="apiKey" placeholder="Paste your AI Studio Key here...">
-
-        <label>🌐 Website URL</label>
-        <input type="text" id="url" value="https://www.daraz.pk/">
-
-        <label>📋 Test Instruction</label>
-        <textarea id="instruction" rows="4">Search for 'iPhone 15 covers', click the first result, and verify if 'Add to Cart' button is visible.</textarea>
-
-        <button onclick="runTest()">🚀 Run QA Test</button>
-        
-        <div class="loading" id="loading">
-            ⚙️ AI is generating script and running browser... please wait...
-        </div>
-
-        <div id="logs"></div>
+    <div class="login-card">
+        <h2>👋 Welcome Back</h2>
+        <p>Login to your QA Automation Dashboard</p>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Sign In</button>
+        <a href="signup.html">New here? Create an account</a>
     </div>
 
     <script>
-        async function runTest() {
-            const apiKey = document.getElementById('apiKey').value;
-            const url = document.getElementById('url').value;
-            const instruction = document.getElementById('instruction').value;
-            const logsDiv = document.getElementById('logs');
-            const loadingDiv = document.getElementById('loading');
-
-            if(!apiKey) { alert("Please enter your API Key!"); return; }
-
-            // Show loading state
-            loadingDiv.style.display = 'block';
-            logsDiv.style.display = 'none';
-            logsDiv.textContent = "";
-
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const btn = document.querySelector('button');
+            
+            if(!username || !password) return alert("Please fill in all fields");
+            
+            btn.innerText = "Verifying...";
             try {
-                const response = await fetch('/api/run-test', {
+                const res = await fetch('/api/login', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ apiKey, url, instruction })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ username, password })
                 });
-
-                const data = await response.json();
-                
-                loadingDiv.style.display = 'none';
-                logsDiv.style.display = 'block';
-
-                if(data.error) {
-                    logsDiv.style.color = 'red';
-                    logsDiv.textContent = "❌ ERROR: \n" + data.error;
-                } else {
-                    logsDiv.style.color = '#0f0';
-                    logsDiv.textContent = "✅ TEST EXECUTION LOGS:\n\n" + data.output;
-                    
-                    // Show the Generated Code (Optional, for transparency)
-                    logsDiv.textContent += "\n\n-------------------\n📜 GENERATED SCRIPT:\n" + data.generatedCode;
-                }
-
-            } catch (err) {
-                loadingDiv.style.display = 'none';
-                alert("Network Error: " + err.message);
-            }
+                const data = await res.json();
+                if(data.success) window.location.href = '/dashboard.html';
+                else alert(data.error);
+            } catch (e) { alert("Server Error"); }
+            btn.innerText = "Sign In";
         }
     </script>
-
 </body>
 </html>
