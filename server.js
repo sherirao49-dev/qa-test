@@ -81,7 +81,7 @@ app.delete('/api/history/:id', (req, res) => {
     });
 });
 
-// --- QA TOOL ROUTE ---
+// --- QA TOOL ROUTE (OPTIMIZED) ---
 app.post('/api/run-test', async (req, res) => {
     if (!req.session.userId) return res.status(401).json({ error: "Please Login First!" });
     
@@ -99,12 +99,11 @@ app.post('/api/run-test', async (req, res) => {
         RULES:
         1. Use 'import { chromium } from "playwright";' ONLY.
         2. Launch browser with { headless: false, slowMo: 1000 }.
-        3. CRITICAL: Use: await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-        4. Do NOT use waitForNavigation. Use await page.waitForTimeout(5000); instead.
-        5. CRITICAL: When clicking the product, use: await page.locator('div[data-qa-locator="product-item"] a, .gridItem--Yd0g9 a, div.box--Mj3Q7 a').first().click();
-           (Fallback: click first 'a' tag containing "iPhone").
+        3. CRITICAL: Use: await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        4. Do NOT use waitForNavigation. Use await page.waitForTimeout(3000); instead.
+        5. CRITICAL: When clicking, use generic selectors like 'a', 'button' or text locators.
         6. To verify success, use simple 'if' statements.
-        7. Log "TEST_RESULT: PASS" or "TEST_RESULT: FAIL".
+        7. Log "TEST_RESULT: PASS" if successful, otherwise throw an error.
         8. Output ONLY raw javascript code.
         `;
 
@@ -113,24 +112,40 @@ app.post('/api/run-test', async (req, res) => {
         const testFileName = `test_${Date.now()}.js`;
         fs.writeFileSync(testFileName, code);
 
+        // Execute the script
         exec(`node ${testFileName}`, (error, stdout, stderr) => {
-            const status = stdout.includes("TEST_RESULT: PASS") ? "PASS" : "FAIL";
             
-            // Save to DB
+            // 1. Determine Status
+            // If 'error' exists (script crashed) OR 'TEST_RESULT: PASS' is missing, it is a FAIL.
+            let status = "PASS";
+            if (error || !stdout.includes("TEST_RESULT: PASS")) {
+                status = "FAIL";
+            }
+
+            // 2. Combine Logs (So we see errors in the database)
+            const finalLogs = error ? (stdout + "\nERROR DETAILS:\n" + stderr) : stdout;
+
+            // 3. Save to DB
             db.run(`INSERT INTO history (user_id, url, instruction, status, date, logs) VALUES (?, ?, ?, ?, ?, ?)`,
-                [req.session.userId, url, instruction, status, new Date().toLocaleString(), stdout]
+                [req.session.userId, url, instruction, status, new Date().toLocaleString(), finalLogs],
+                (err) => {
+                    if (err) console.error("DB Insert Failed:", err);
+                }
             );
 
-            // AUTO-DELETE: Clean up the file immediately after running
+            // 4. Cleanup Temp File
             try {
-                fs.unlinkSync(testFileName);
+                if (fs.existsSync(testFileName)) fs.unlinkSync(testFileName);
             } catch (err) {
-                console.error("Could not delete temp file:", err);
+                console.error("Cleanup Error:", err);
             }
             
-            res.json({ success: true, output: stdout, status: status });
+            // 5. Send Response (Prevents the 500 Error)
+            res.json({ success: true, output: finalLogs, status: status });
         });
+
     } catch (error) {
+        console.error("Server Error:", error);
         res.status(500).json({ error: error.message });
     }
 });

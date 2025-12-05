@@ -243,7 +243,7 @@
             fetch('/api/logout', { method: 'POST' }).then(() => window.location.href = '/index.html');
         }
 
-        // 3. Run Test
+        // 3. Run Test (FIXED VERSION)
         async function runTest() {
             const url = document.getElementById('url').value;
             const instruction = document.getElementById('instruction').value;
@@ -251,9 +251,11 @@
             const statusDiv = document.getElementById('status');
             const statusText = document.getElementById('statusText');
 
+            // Reset UI
             runBtn.disabled = true;
             statusDiv.style.display = 'flex';
             statusText.innerText = "Agent is launching browser...";
+            statusText.style.color = "#4f46e5"; // Default Blue
 
             try {
                 const res = await fetch('/api/run-test', {
@@ -261,14 +263,37 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ url, instruction })
                 });
-                const data = await res.json();
                 
-                statusText.innerText = "Test Complete: " + data.status;
-                setTimeout(() => statusDiv.style.display = 'none', 3000);
+                const data = await res.json();
+
+                if (!res.ok || data.error) {
+                    // Server returned an error
+                    statusText.innerText = "Error: " + (data.error || "Server Failed");
+                    statusText.style.color = "#ef4444"; // Red
+                } else {
+                    // Success!
+                    // Check if the test result itself was PASS or FAIL
+                    const resultStatus = data.status || "Completed";
+                    statusText.innerText = "Test Complete: " + resultStatus;
+                    
+                    if(resultStatus === "PASS") {
+                        statusText.style.color = "#10b981"; // Green
+                    } else {
+                        statusText.style.color = "#ef4444"; // Red
+                    }
+                }
+
                 loadHistory();
+
+                // Hide status message after 4 seconds
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 4000);
+
             } catch (e) {
-                alert("System Error: " + e.message);
-                statusDiv.style.display = 'none';
+                console.error(e);
+                statusText.innerText = "System Error: " + e.message;
+                statusText.style.color = "#ef4444";
             } finally {
                 runBtn.disabled = false;
             }
